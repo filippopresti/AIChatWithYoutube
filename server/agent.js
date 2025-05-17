@@ -12,17 +12,15 @@ const video1 = data[0]; // first scraped video data
 const video1_id = video1.video_id;
 const video2 = data[1]; // second scraped video data
 const video2_id = video2.video_id;
-await addYTVideoToVectorStore(video1); // add the video to the vector store
-await addYTVideoToVectorStore(video2); // add the video to the vector store
+// await addYTVideoToVectorStore(video1); // add the first video to the vector store
+// await addYTVideoToVectorStore(video2); // add the second video to the vector store
 
 // Retrieval tool
 const retrieveTool = tool(
   async ({ query }, { configurable: { video_id } }) => {
-    const retrievedDocs = await vectorStore.similaritySearch(
-      query,
-      3,
-      (doc) => doc.metadata.video_id === video_id
-    );
+    const retrievedDocs = await vectorStore.similaritySearch(query, 3, {
+      video_id,
+    });
 
     const serializedDocs = retrievedDocs
       .map((doc) => doc.pageContent)

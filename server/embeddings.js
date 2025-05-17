@@ -1,7 +1,8 @@
+// server/embeddings.js
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { Document } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 
 // Embed the chunks
 const embeddings = new OpenAIEmbeddings({
@@ -9,7 +10,19 @@ const embeddings = new OpenAIEmbeddings({
 });
 
 // Create vector store
-export const vectorStore = new MemoryVectorStore(embeddings);
+export const vectorStore = await PGVectorStore.initialize(embeddings, {
+  postgresConnectionOptions: {
+    connectionString: process.env.DB_URL,
+  },
+  tableName: "transcripts",
+  columns: {
+    idColumnName: "id",
+    vectorColumnName: "vector",
+    contentColumnName: "content",
+    metadataColumnName: "metadata",
+  },
+  distanceStrategy: "cosine", // Function to calculate the similarity between vectors
+});
 
 export const addYTVideoToVectorStore = async (videoData) => {
   const { video_id, transcript } = videoData;
