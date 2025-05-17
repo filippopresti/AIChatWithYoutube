@@ -46,28 +46,8 @@ const llm = new ChatAnthropic({
 const memorySaver = new MemorySaver();
 
 // Create a React-style agent, wiring in your LLM and any tools
-const agent = createReactAgent({
+export const agent = createReactAgent({
   llm,
   tools: [retrieveTool],
   checkpointer: memorySaver,
 });
-
-console.log(
-  "Q1: What will people learn from the video (based on its transcript)? ------------"
-);
-// Invoke a single-turn chat with your agent
-const results = await agent.invoke(
-  {
-    messages: [
-      {
-        role: "user",
-        content:
-          "What will people learn from this video (based on its trascript)?",
-      },
-    ],
-  },
-  { configurable: { thread_id: 1, video_id: video2_id } }
-);
-
-// Log out the last result
-console.log(results.messages.at(-1)?.content);
