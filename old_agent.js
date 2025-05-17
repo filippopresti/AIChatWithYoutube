@@ -114,3 +114,79 @@ const results = await agent.invoke(
 
 // Log out the last result
 console.log(results.messages.at(-1)?.content);
+
+// scraper.js
+// scraper.js
+import axios from "axios";
+import { load } from "cheerio";
+import { writeFile } from "fs/promises";
+import path from "path";
+
+async function scrapeCoursePage(url) {
+  const { data: html } = await axios.get(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    timeout: 30_000,
+  });
+  const $ = load(html);
+  return $("main")
+    .find("p, h1, h2, h3, li")
+    .map((_, el) => $(el).text().trim())
+    .get()
+    .join("\n\n");
+}
+
+/**
+ * Clean up raw scraped text
+ */
+function cleanText(raw) {
+  return raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter(
+      (l) =>
+        ![
+          "Toggle caption",
+          "Caption",
+          "See all stories",
+          "Open days",
+          "CCI Shows 2025",
+          "CCI news",
+        ].includes(l)
+    )
+    .filter(
+      (l) =>
+        !l.match(
+          /^(Image|Photo|Small robot|Image courtesy|Courtesy UAL|Image credit)/
+        )
+    )
+    .filter((l, i, arr) => arr.indexOf(l) === i)
+    .join("\n\n");
+}
+
+(async () => {
+  // 1. List of URLs you care about
+  const urls = [
+    "https://www.arts.ac.uk/creative-computing-institute",
+    "https://www.arts.ac.uk/creative-computing-institute/courses",
+    // …etc…
+  ];
+
+  // 2. Scrape each page and clean it
+  const results = [];
+  for (const url of urls) {
+    console.log("Fetching", url);
+    const raw = await scrapeCoursePage(url);
+    const text = cleanText(raw);
+    results.push({
+      url,
+      scrapedAt: new Date().toISOString(),
+      text, // now the cleaned text
+    });
+  }
+
+  // 3. Write out to data/courses.json
+  const outPath = path.resolve("data", "courses.json");
+  await writeFile(outPath, JSON.stringify(results, null, 2), "utf8");
+  console.log("Wrote", results.length, "records to", outPath);
+})();

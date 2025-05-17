@@ -1,2 +1,13 @@
+# Node modules
 **/node_modules/
+
+# Env files
 .env
+server/.env
+
+# Data dumps
+.envdata/*.json
+
+# Old/untracked files
+../old_agent.js
+fake.js
