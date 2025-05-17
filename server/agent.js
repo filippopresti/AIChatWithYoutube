@@ -1,62 +1,28 @@
-// testing the file
-// console.log("Agent started");
-
+// server/agent.js
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { Document } from "@langchain/core/documents";
-
-import { OpenAIEmbeddings } from "@langchain/openai";
-
-// import scraped data using brightdata
-import data from "./data.js";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
-
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+import { MemorySaver } from "@langchain/langgraph";
+import { vectorStore, addYTVideoToVectorStore } from "./embeddings.js";
+// import scraped data using brightdata
+import data from "./data.js";
 
 const video1 = data[0]; // first scraped video data
-const docs = [
-  new Document({
-    pageContent: video1.transcript,
-    metadata: { video_id: video1.video_id },
-  }),
-];
-
-// Split video trasncription into chunks
-const splitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 1000,
-  chunkOverlap: 200,
-});
-
-const chunks = await splitter.splitDocuments(docs);
-// console.log(chunks);
-
-// Embed the chunks
-const embeddings = new OpenAIEmbeddings({
-  model: "text-embedding-3-large",
-});
-
-// Create vector store
-const vectorStore = new MemoryVectorStore(embeddings);
-
-await vectorStore.addDocuments(chunks);
-
-// Retrieve the most relevan chunks
-const retrievedDocs = await vectorStore.similaritySearch(
-  "What was the finish time of Norris?",
-  5
-);
-// console.log("Retrieved Docs:----------------------");
-console.log(retrievedDocs);
+const video1_id = video1.video_id;
+const video2 = data[1]; // second scraped video data
+const video2_id = video2.video_id;
+await addYTVideoToVectorStore(video1); // add the video to the vector store
+await addYTVideoToVectorStore(video2); // add the video to the vector store
 
 // Retrieval tool
 const retrieveTool = tool(
-  async ({ query }) => {
-    console.log("Retrieving docs for query...");
-    console.log(query);
-    const retrievedDocs = await vectorStore.similaritySearch(query, 5);
+  async ({ query }, { configurable: { video_id } }) => {
+    const retrievedDocs = await vectorStore.similaritySearch(
+      query,
+      3,
+      (doc) => doc.metadata.video_id === video_id
+    );
 
     const serializedDocs = retrievedDocs
       .map((doc) => doc.pageContent)
@@ -79,13 +45,31 @@ const llm = new ChatAnthropic({
   modelName: "claude-3-7-sonnet-latest",
 });
 
-// Create a React-style agent, wiring in your LLM and any tools
-const agent = createReactAgent({ llm, tools: [retrieveTool] });
+const memorySaver = new MemorySaver();
 
-// Invoke a single-turn chat with your agent
-const results = await agent.invoke({
-  messages: [{ role: "user", content: "What was the finish time of Norris?" }],
+// Create a React-style agent, wiring in your LLM and any tools
+const agent = createReactAgent({
+  llm,
+  tools: [retrieveTool],
+  checkpointer: memorySaver,
 });
+
+console.log(
+  "Q1: What will people learn from the video (based on its transcript)? ------------"
+);
+// Invoke a single-turn chat with your agent
+const results = await agent.invoke(
+  {
+    messages: [
+      {
+        role: "user",
+        content:
+          "What will people learn from this video (based on its trascript)?",
+      },
+    ],
+  },
+  { configurable: { thread_id: 1, video_id: video2_id } }
+);
 
 // Log out the last result
 console.log(results.messages.at(-1)?.content);
